@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravelSmart | Hotel Recommender</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <header>
+        <div class="brand">TravelSmart</div>
+        <h1>Find Your Perfect Stay</h1>
+        <p>Compare prices, ratings, and amenities instantly.</p>
+    </header>
+
+    <main>
+        <div class="search-panel">
+            <div class="input-group">
+                <label for="cityInput">Destination</label>
+                <input type="text" id="cityInput" placeholder="e.g. Kigali, Paris...">
+                <span id="cityInput-error" class="error-message hidden"></span>
+            </div>
+
+            <div class="date-group">
+                <div class="input-group">
+                    <label for="checkinDate">Check-in</label>
+                    <input type="date" id="checkinDate">
+                    <span id="checkinDate-error" class="error-message hidden"></span>
+                </div>
+                <div class="input-group">
+                    <label for="checkoutDate">Check-out</label>
+                    <input type="date" id="checkoutDate">
+                    <span id="checkoutDate-error" class="error-message hidden"></span>
+                </div>
+            </div>
+
+            <button onclick="initialSearch()" class="search-btn">Search Hotels</button>
+        </div>
+        
+        <div id="results-controls" class="results-controls hidden">
+            <div class="controls-group">
+                <label for="sortOrder">Sort By:</label>
+                <select id="sortOrder" onchange="reRenderHotels()">
+                    <option value="popularity">Popularity</option>
+                    <option value="price">Price: Low to High</option>
+                    <option value="class_descending">Star Rating: High to Low</option>
+                </select>
+            </div>
+        
+            </div>
+        </div>
+
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Scanning best deals...</p>
+        </div>
+
+        <div id="hotel-container" class="container">
+            </div>
+    </main>
+
+    <div id="hotel-details-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modal-hotel-name"></h2>
+            <div id="modal-details-body">
+                </div>
+            <a id="modal-booking-link" href="#" target="_blank" class="booking-link-btn">Book Directly on Booking.com</a>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
