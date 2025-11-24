@@ -172,6 +172,12 @@ input.error-border, select.error-border {
 /* slightly larger facility list for modal */
 .facility-list { columns: 2; list-style: disc inside; padding-left: 15px; margin-top: 10px; font-size:0.95rem; }
 
+/* Facility icon / item styling */
+.facility-item { display:flex; gap:10px; align-items:flex-start; margin:6px 0; }
+.facility-item .fac-icon { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; flex:0 0 20px; }
+.fac-svg { width:18px; height:18px; display:block; }
+.fac-text { font-size:0.95rem; color:#333; }
+
 @media (max-width: 900px) {
     .modal-grid { grid-template-columns: 1fr; }
     .modal-info { order: 2; }
