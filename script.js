@@ -6,7 +6,43 @@ let hotelDetailsCache = {};
 // Cache for destination lookups to avoid repeated API calls for the same city
 let destCache = {};
 
-// Run search automatically when the page is loaded
+// --- Simple persistent cache (localStorage) ---------------------------------
+const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+const CACHE_KEYS = {
+    lastSearch: 'sr_lastSearch',
+    hotelPrefix: 'sr_hotel_' // append hotelId
+};
+
+function saveToLocalCache(key, value) {
+    try {
+        const wrapped = { __cachedAt: Date.now(), value };
+        localStorage.setItem(key, JSON.stringify(wrapped));
+    } catch (e) {
+        // localStorage may be full or unavailable in some contexts
+        console.warn('Could not save to local cache', e);
+    }
+}
+
+function loadFromLocalCache(key, maxAge = CACHE_TTL_MS) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.__cachedAt) return null;
+        if (Date.now() - parsed.__cachedAt > maxAge) {
+            localStorage.removeItem(key);
+            return null;
+        }
+        return parsed.value;
+    } catch (e) {
+        console.warn('Could not read from local cache', e);
+        return null;
+    }
+}
+
+// NOTE: cached banner removed per user request — cached rendering will be silent on first load.
+
+// Run search automatically when the page is loaded (render cached data first if present)
 window.onload = () => {
     // Pre-set destination and dates
     const defaultCity = "Rwanda";
@@ -20,8 +56,26 @@ window.onload = () => {
     document.getElementById('checkinDate').value = defaultCheckinDate;
     document.getElementById('checkoutDate').value = defaultCheckout;
 
-    // Trigger search with default values
-    initialSearch();
+    // If we have a recent cached search, render it immediately so the user
+    try {
+        const cached = loadFromLocalCache(CACHE_KEYS.lastSearch);
+        const sessionShown = sessionStorage.getItem('sr_cache_auto_shown');
+        // Only auto-render cached results silently on the first page load for this session
+        if (!sessionShown && cached && cached.rawHotelData && cached.currentDestinationData) {
+            sessionStorage.setItem('sr_cache_auto_shown', '1');
+            rawHotelData = cached.rawHotelData;
+            currentDestinationData = cached.currentDestinationData;
+            reRenderHotels();
+            // Attempt a silent background refresh to update results (no UI banner)
+            initialSearch();
+        } else {
+            // Either we've already shown cache this session, or no cache exists — do normal search
+            initialSearch();
+        }
+    } catch (e) {
+        console.warn('Error while loading cache on startup', e);
+        initialSearch();
+    }
 };
 
 // --- Helper function to fetch and cache hotel photos ---
@@ -161,9 +215,6 @@ function closeModal() {
 // --- API FUNCTIONS (getDestinationID and initialSearch remain the same) ---
 
 async function getDestinationID(city) {
-    // If destination lookups are currently blocked due to rate-limiting, short-circuit
-    // Previously we used a short-circuit guard here to block requests after a 429.
-    // That logic has been removed so the UI won't be blocked by an internal timer.
 
     // Return cached dest if we have it
     const key = city.trim().toLowerCase();
@@ -272,6 +323,12 @@ async function initialSearch() {
         
         document.getElementById('results-controls').classList.remove('hidden');
         reRenderHotels();
+        // Persist the successful search results so we can show cached data on next load
+        try {
+            saveToLocalCache(CACHE_KEYS.lastSearch, { rawHotelData, currentDestinationData });
+        } catch (e) {
+            console.warn('Failed to save search results to cache', e);
+        }
 
     } catch (error) {
         console.error('Search Error:', error);
@@ -415,6 +472,25 @@ async function viewHotelDetails(hotelId, hotelName) {
     }
 
     // Pull hotel data from API (if we don't already have it in cache)
+        // First try a persistent local cache so details appear instantly when available
+        try {
+            const cachedHotel = loadFromLocalCache(CACHE_KEYS.hotelPrefix + hotelId);
+            if (cachedHotel) {
+                hotelDetailsCache[hotelId] = cachedHotel;
+                // Render cached details immediately (silent), then refresh in background
+                renderHotelModal(cachedHotel, hotelId);
+                (async () => {
+                    const fresh = await fetchHotelDetails(hotelId, arrival, departure);
+                    if (fresh) {
+                        hotelDetailsCache[hotelId] = fresh;
+                        renderHotelModal(fresh, hotelId);
+                    }
+                })();
+                return;
+            }
+        } catch (e) {
+            console.warn('Error while reading cached hotel details', e);
+        }
     if (!hotelDetailsCache[hotelId]) {
         // Do NOT set an internal rate-limit timer; just fetch details and cache result.
         hotelDetailsCache[hotelId] = await fetchHotelDetails(hotelId, arrival, departure);
@@ -473,21 +549,28 @@ async function fetchHotelDetails(hotelId, arrivalDate, departureDate) {
             }
         });
         if (!response.ok) {
+            // If provider rate-limited, try returning a cached copy if available.
             if (response.status === 429) {
-                console.warn('Hotel Details API returned 429 - rate limit.');
+                console.warn('Hotel Details API returned 429 - rate limit. Trying cached data if available.');
+                const cached = loadFromLocalCache(CACHE_KEYS.hotelPrefix + hotelId);
+                if (cached) return cached;
                 return null;
             }
             console.error('Hotel Details API call failed with status', response.status);
+            const cached = loadFromLocalCache(CACHE_KEYS.hotelPrefix + hotelId);
+            if (cached) return cached;
             return null;
         }
         const result = await response.json();
         // Many providers (including the sample `details.json`) wrap the real payload
         // under a top-level `data` key. Ensure we return that inner object so
         // `renderHotelModal` receives the expected hotel details shape.
-        if (result && typeof result === 'object' && result.data) {
-            return result.data;
+        const payload = (result && typeof result === 'object' && result.data) ? result.data : result;
+        if (payload) {
+            // persist hotel details for offline / fallback use
+            try { saveToLocalCache(CACHE_KEYS.hotelPrefix + hotelId, payload); } catch (e) { /* ignore */ }
         }
-        return result;
+        return payload;
     } catch (error) {
         console.error('Error fetching hotel details:', error);
         return null;
