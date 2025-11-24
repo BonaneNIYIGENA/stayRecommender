@@ -38,14 +38,16 @@ A modern, responsive hotel search application that helps users who are tourists 
     const API_HOST = 'booking-com15.p.rapidapi.com';
     ```
 
-4. **Run the Application**:
+4. **Run the Application Locally/Online**:
     - Open `index.html` in a web browser.
     - No server setup required — runs entirely client-side.
+    - **Live Session**
+          - Can be accessed through http://bonaneniyigena.tech/
 
 ## 🛠️ Technical Stack
 
 - **Frontend**: HTML, CSS and JavaScript
-- **API**: Booking.com API via RapidAPI
+- **API**: Booking COM API via RapidAPI (https://rapidapi.com/DataCrawler/api/booking-com15)
 - **Caching**: LocalStorage
 
 ## 🔧 Core Functions
@@ -70,7 +72,10 @@ A modern, responsive hotel search application that helps users who are tourists 
 - Date formatting and validation.
 - Responsive image gallery.
 
-## 🎨 UI Components
+##  UI Components
+
+### **Video Demonstration**
+- Link to the video: 
 
 ### **Search Panel**
 
