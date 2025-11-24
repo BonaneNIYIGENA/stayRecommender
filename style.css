@@ -292,39 +292,95 @@ input.error-border, select.error-border {
     flex: 1;
 }
 
-/* Modal Grid Layout */
-.modal-grid { 
-    display: grid; 
-    grid-template-columns: 1.2fr 1fr; 
-    gap: 30px;
-    align-items: start;
+/* New Vertical Layout for Modal */
+.modal-layout-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
 }
 
-/* Gallery Styles */
-.gallery { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 12px;
+.gallery-top {
+    width: 100%;
 }
 
-.gallery-main { 
+.details-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Updated Gallery Styles for Top Layout */
+.gallery-top .gallery-main {
     background: #f7f8fa; 
     border-radius: 12px; 
     padding: 0;
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    min-height: 350px;
-    max-height: 450px;
+    min-height: 400px;
+    max-height: 500px;
     overflow: hidden;
     position: relative;
+    margin-bottom: 15px;
 }
 
-.gallery-main img { 
+.gallery-top .gallery-main img { 
     width: 100%;
     height: 100%;
     object-fit: cover;
     border-radius: 12px;
+}
+
+.gallery-top .gallery-thumbs {
+    display: flex; 
+    gap: 10px; 
+    overflow-x: auto; 
+    padding: 10px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc transparent;
+}
+
+.gallery-top .gallery-thumbs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.gallery-top .gallery-thumbs::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.gallery-top .gallery-thumbs::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.gallery-top .gallery-thumbs .thumb { 
+    min-width: 100px;
+    width: 100px; 
+    height: 75px; 
+    border-radius: 8px; 
+    overflow: hidden; 
+    cursor: pointer; 
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.gallery-top .gallery-thumbs .thumb img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    display: block; 
+}
+
+.gallery-top .gallery-thumbs .thumb:hover { 
+    border-color: var(--accent); 
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.gallery-top .gallery-thumbs .thumb.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* Placeholder for no images */
@@ -346,59 +402,6 @@ input.error-border, select.error-border {
     font-size: 1.1rem;
     font-weight: 500;
     color: #888;
-}
-
-/* Thumbnails */
-.gallery-thumbs { 
-    display: flex; 
-    gap: 10px; 
-    overflow-x: auto; 
-    padding: 5px 0;
-    scrollbar-width: thin;
-    scrollbar-color: #ccc transparent;
-}
-
-.gallery-thumbs::-webkit-scrollbar {
-    height: 6px;
-}
-
-.gallery-thumbs::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.gallery-thumbs::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 3px;
-}
-
-.gallery-thumbs .thumb { 
-    min-width: 90px;
-    width: 90px; 
-    height: 65px; 
-    border-radius: 8px; 
-    overflow: hidden; 
-    cursor: pointer; 
-    border: 2px solid transparent;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-
-.gallery-thumbs .thumb img { 
-    width: 100%; 
-    height: 100%; 
-    object-fit: cover; 
-    display: block; 
-}
-
-.gallery-thumbs .thumb:hover { 
-    border-color: var(--accent); 
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.gallery-thumbs .thumb.active {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* Info Card */
@@ -537,16 +540,22 @@ input.error-border, select.error-border {
     box-shadow: 0 4px 12px rgba(0, 108, 228, 0.3);
 }
 
+/* Remove old grid styles that are no longer needed */
+.modal-grid {
+    display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 900px) {
-    .modal-grid { 
-        grid-template-columns: 1fr;
-        gap: 20px;
+    .gallery-top .gallery-main {
+        min-height: 300px;
+        max-height: 350px;
     }
     
-    .gallery-main {
-        min-height: 250px;
-        max-height: 300px;
+    .gallery-top .gallery-thumbs .thumb {
+        min-width: 80px;
+        width: 80px;
+        height: 60px;
     }
     
     #modal-hotel-name {
@@ -570,6 +579,20 @@ input.error-border, select.error-border {
         border-radius: 12px 12px 0 0;
     }
     
+    .gallery-top .gallery-main {
+        min-height: 250px;
+        max-height: 280px;
+    }
+    
+    .details-content {
+        gap: 15px;
+    }
+    
+    .info-card,
+    .detail-section {
+        padding: 15px;
+    }
+    
     .search-panel {
         padding: 20px;
         margin: -20px auto 20px;
@@ -584,4 +607,49 @@ input.error-border, select.error-border {
         width: auto;
         justify-content: flex-start;
     }
+    
+    .date-group {
+        flex-direction: column;
+    }
+}
+
+/* Additional utility classes */
+.text-center {
+    text-align: center;
+}
+
+.mb-20 {
+    margin-bottom: 20px;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-column {
+    flex-direction: column;
+}
+
+.align-center {
+    align-items: center;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.gap-10 {
+    gap: 10px;
+}
+
+.gap-15 {
+    gap: 15px;
+}
+
+.gap-20 {
+    gap: 20px;
 }

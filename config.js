@@ -1,3 +1,3 @@
 // config.js
-const API_KEY = '13feb84e09msh83d74128d6b9d4cp12fe66jsn40ef676c1c72';
+const API_KEY = '9df78634d5msh88c921f64d14fa3p10d26ajsn812562eecec1';
 const API_HOST = 'booking-com15.p.rapidapi.com';
