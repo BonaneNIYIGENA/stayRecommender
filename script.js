@@ -5,20 +5,15 @@ let currentDestinationData = null; // Stores destId, city_name, etc.
 let hotelDetailsCache = {};
 // Cache for destination lookups to avoid repeated API calls for the same city
 let destCache = {};
-// Note: rate-limiting guards removed to avoid accidental blocking in UI.
-
-// Ensure API_KEY and API_HOST are defined in config.js
-// const API_KEY = '...'; 
-// const API_HOST = 'booking-com15.p.rapidapi.com'; 
 
 // Run search automatically when the page is loaded
 window.onload = () => {
     // Pre-set destination and dates
-    const defaultCity = "Rwanda"; // Set default to "Rwanda"
-    const defaultCheckinDate = new Date().toISOString().split('T')[0]; // Today's date (YYYY-MM-DD)
+    const defaultCity = "Rwanda";
+    const defaultCheckinDate = new Date().toISOString().split('T')[0]; 
     const defaultCheckoutDate = new Date();
-    defaultCheckoutDate.setDate(defaultCheckoutDate.getDate() + 7); // 7 days from today
-    const defaultCheckout = defaultCheckoutDate.toISOString().split('T')[0]; // (YYYY-MM-DD)
+    defaultCheckoutDate.setDate(defaultCheckoutDate.getDate() + 7); 
+    const defaultCheckout = defaultCheckoutDate.toISOString().split('T')[0];
 
     // Set the inputs to default values
     document.getElementById('cityInput').value = defaultCity;
@@ -57,6 +52,14 @@ async function getHotelPhotos(hotelId) {
 async function renderHotelModal(data, hotelId) {
     const modalName = document.getElementById('modal-hotel-name');
     const modalBody = document.getElementById('modal-details-body');
+    // Defensive: if API returned no data, show friendly message
+    if (!data) {
+        modalName.innerText = 'Details Unavailable';
+        modalBody.innerHTML = `<p style="color:var(--error-text);">Hotel details could not be loaded. The provider may be rate-limiting or returned no data. Try again in a moment.</p>`;
+        document.getElementById('modal-booking-link').href = '#';
+        return;
+    }
+
     modalName.innerText = data.hotel_name || 'Hotel Details';
     document.getElementById('modal-booking-link').href = data.url || '#';
 
@@ -418,6 +421,35 @@ async function viewHotelDetails(hotelId, hotelName) {
     }
 
     const hotelData = hotelDetailsCache[hotelId];
+
+    // If we failed to fetch details (null/undefined), show a friendly error and a retry button
+    if (!hotelData) {
+        modalName.innerText = `Unable to load ${hotelName}`;
+        modalBody.innerHTML = `
+            <p style="color:var(--error-text);">Details for this hotel couldn't be retrieved. This can happen when the API returns no data or is temporarily rate-limited.</p>
+            <p style="text-align:center;"><button id="retry-details" class="search-btn" style="padding:8px 16px;">Retry</button></p>
+            <p style="font-size:0.85rem; color:#666; text-align:center;">If this persists, verify your API key in <code>config.js</code> or try again later.</p>
+        `;
+
+        const retryBtn = document.getElementById('retry-details');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', async () => {
+                modalName.innerText = `Loading ${hotelName}...`;
+                modalBody.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
+                const data = await fetchHotelDetails(hotelId, arrival, departure);
+                hotelDetailsCache[hotelId] = data;
+                if (data) {
+                    renderHotelModal(data, hotelId);
+                } else {
+                    modalName.innerText = `Unable to load ${hotelName}`;
+                    modalBody.innerHTML = `<p style=\"color:var(--error-text);\">Still no data. Try again later or check your API configuration.</p>`;
+                }
+            });
+        }
+
+        return;
+    }
+
     renderHotelModal(hotelData, hotelId);
 }
 function toApiDate(dateStr) {
@@ -449,6 +481,12 @@ async function fetchHotelDetails(hotelId, arrivalDate, departureDate) {
             return null;
         }
         const result = await response.json();
+        // Many providers (including the sample `details.json`) wrap the real payload
+        // under a top-level `data` key. Ensure we return that inner object so
+        // `renderHotelModal` receives the expected hotel details shape.
+        if (result && typeof result === 'object' && result.data) {
+            return result.data;
+        }
         return result;
     } catch (error) {
         console.error('Error fetching hotel details:', error);
