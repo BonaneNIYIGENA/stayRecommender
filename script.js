@@ -5,8 +5,7 @@ let currentDestinationData = null; // Stores destId, city_name, etc.
 let hotelDetailsCache = {};
 // Cache for destination lookups to avoid repeated API calls for the same city
 let destCache = {};
-// Rate-limit guard for destination lookups
-let destRateLimitUntil = null;
+// Note: rate-limiting guards removed to avoid accidental blocking in UI.
 
 // Ensure API_KEY and API_HOST are defined in config.js
 // const API_KEY = '...'; 
@@ -160,10 +159,8 @@ function closeModal() {
 
 async function getDestinationID(city) {
     // If destination lookups are currently blocked due to rate-limiting, short-circuit
-    if (destRateLimitUntil && Date.now() < destRateLimitUntil) {
-        console.warn('Destination lookup temporarily blocked due to recent rate-limit.');
-        return null;
-    }
+    // Previously we used a short-circuit guard here to block requests after a 429.
+    // That logic has been removed so the UI won't be blocked by an internal timer.
 
     // Return cached dest if we have it
     const key = city.trim().toLowerCase();
@@ -181,10 +178,10 @@ async function getDestinationID(city) {
     try {
         const response = await fetch(url, options);
         if (!response.ok) {
-            // Handle rate-limit explicitly and set a short cooldown
+            // Handle rate-limit by logging but do not set an internal cooldown that blocks the UI.
             if (response.status === 429) {
-                console.warn('Destination API returned 429 - rate limit.');
-                destRateLimitUntil = Date.now() + (60 * 1000); // block for 60s
+                console.warn('Destination API returned 429 - rate limit. Continuing without internal block.');
+                // return null so caller can handle empty result; do NOT set a cooldown timer
                 return null;
             }
             console.error('Destination API call failed with status', response.status);
@@ -243,13 +240,7 @@ async function initialSearch() {
     if (searchBtn) searchBtn.disabled = true;
 
     // Step A: Get Destination ID
-    // If destination lookups are currently rate-limited, show friendly message and bail
-    if (destRateLimitUntil && Date.now() < destRateLimitUntil) {
-        loading.classList.add('hidden');
-        if (searchBtn) searchBtn.disabled = false;
-        const waitSeconds = Math.ceil((destRateLimitUntil - Date.now()) / 1000);
-        return showInlineError('cityInput', `Temporarily limited by provider. Please wait ${waitSeconds}s and try again.`);
-    }
+    // Removed UI-blocking cooldown that would have prevented retries after a 429.
 
     currentDestinationData = await getDestinationID(cityInput);
 
@@ -405,11 +396,9 @@ async function viewHotelDetails(hotelId, hotelName) {
         return;
     }
 
-    if (rateLimitUntil && Date.now() < rateLimitUntil) {
-        modalName.innerText = `Cannot load ${hotelName} right now`;
-        modalBody.innerHTML = `<p style="color:var(--error-text);">We're temporarily limited by the provider. Please wait a minute and try again.</p>`;
-        return;
-    }
+    // Removed hotel-details rate-limit guard to avoid a missing-variable ReferenceError
+    // and to allow retries even after transient provider 429s. We still log 429s in the
+    // fetch call below but we won't block UI by setting internal timers.
 
     if (!window.hotelPhotosCache) window.hotelPhotosCache = {};
 
@@ -424,7 +413,7 @@ async function viewHotelDetails(hotelId, hotelName) {
 
     // Pull hotel data from API (if we don't already have it in cache)
     if (!hotelDetailsCache[hotelId]) {
-        rateLimitUntil = Date.now() + (1000 * 60); // Block calls for 1 minute
+        // Do NOT set an internal rate-limit timer; just fetch details and cache result.
         hotelDetailsCache[hotelId] = await fetchHotelDetails(hotelId, arrival, departure);
     }
 
