@@ -396,6 +396,11 @@ input.error-border, select.error-border {
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
+.gallery-thumbs .thumb.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
 /* Info Card */
 .modal-info { 
     display: flex; 
@@ -408,6 +413,7 @@ input.error-border, select.error-border {
     border-radius: 12px; 
     padding: 20px; 
     border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .info-row { 
@@ -460,6 +466,7 @@ input.error-border, select.error-border {
     color: var(--primary); 
     margin: 0 0 15px 0;
     font-size: 1.1rem;
+    font-weight: 600;
 }
 
 .detail-section p {
@@ -468,34 +475,45 @@ input.error-border, select.error-border {
     color: #374151;
 }
 
-/* Facility List */
+/* Facility List - Clean design without boxes */
 .facility-list { 
     list-style: none;
     padding: 0;
     margin: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .facility-item { 
     display: flex; 
-    gap: 10px; 
+    gap: 12px; 
     align-items: center;
-    padding: 8px 12px;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
+    padding: 8px 0;
+    background: transparent;
+    border-radius: 0;
+    border: none;
+    transition: transform 0.2s;
+}
+
+.facility-item:hover {
+    transform: translateX(5px);
 }
 
 .facility-item .fac-icon { 
     font-size: 1.2rem;
     flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .fac-text { 
-    font-size: 0.9rem; 
+    font-size: 0.95rem; 
     color: #374151;
+    font-weight: 500;
 }
 
 /* Booking Link Button */
@@ -555,5 +573,15 @@ input.error-border, select.error-border {
     .search-panel {
         padding: 20px;
         margin: -20px auto 20px;
+    }
+    
+    .info-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .info-row .icon {
+        width: auto;
+        justify-content: flex-start;
     }
 }
