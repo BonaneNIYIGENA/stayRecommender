@@ -28,18 +28,7 @@ Filter results (e.g., minimum rating)
 
 ## 2. Live Demo Links
 
-(Replace these with your actual server URLs)
-
-Web01: http://web01.yourdomain.com
-
-Web02: http://web02.yourdomain.com
-
-Load Balancer (Lb01): http://lb01.yourdomain.com
-
-GitHub Repository: https://github.com/yourusername/hotel-recommender
-
-Demo Video: https://your-demo-link.com
-
+Demo Video: [https://your-demo-link.com](https://youtu.be/BjE49iOLJAQ)
 ⚙️ 3. Features
 🔍 Search
 
