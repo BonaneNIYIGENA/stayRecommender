@@ -1,6 +1,6 @@
 :root {
-    --primary: #003580;
-    --accent: #006ce4;
+    --primary: #188d01;
+    --accent: #1ba100;
     --bg: #f2f6fa;
     --text: #1a1a1a;
     --error-text: #d93025;
@@ -21,7 +21,7 @@ body {
 /* Header & Layout */
 header {
     background-color: var(--primary);
-    color: white;
+    color: rgb(0, 0, 0);
     padding: 40px 20px;
     text-align: center;
 }
@@ -31,7 +31,7 @@ main { padding: 0 20px; }
 
 /* Search Panel & Inputs */
 .search-panel {
-    background: white;
+    background: rgb(255, 255, 255);
     max-width: 1200px;
     margin: -30px auto 30px;
     padding: 25px;
