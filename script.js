@@ -561,22 +561,22 @@ async function renderHotelModal(data, hotelId) {
         photos = await getHotelPhotos(hotelId);
     }
 
-    // Build gallery
+    // Build gallery - Now placed at the top
     const galleryHTML = photos.length > 0 ? `
-        <div class="gallery">
+        <div class="gallery-top">
             <div class="gallery-main">
                 <img id="modal-main-img" src="${photos[0]}" alt="Hotel photo">
             </div>
             <div class="gallery-thumbs">
                 ${photos.map((p, i) => `
-                    <div class="thumb" data-src="${p}">
+                    <div class="thumb ${i === 0 ? 'active' : ''}" data-src="${p}">
                         <img src="${p}" alt="thumb-${i}">
                     </div>
                 `).join('')}
             </div>
         </div>
     ` : `
-        <div class="gallery">
+        <div class="gallery-top">
             <div class="gallery-main gallery-placeholder">
                 <div class="placeholder-content">
                     <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -659,10 +659,11 @@ async function renderHotelModal(data, hotelId) {
         </div>
     ` : '';
 
+    // New layout: Gallery on top, all details below in a single column
     modalBody.innerHTML = `
-        <div class="modal-grid">
+        <div class="modal-layout-vertical">
             ${galleryHTML}
-            <div class="modal-info">
+            <div class="details-content">
                 ${infoHTML}
                 ${descHTML}
                 ${facilitiesHTML}
@@ -676,7 +677,14 @@ async function renderHotelModal(data, hotelId) {
         document.querySelectorAll('.gallery-thumbs .thumb').forEach(t => {
             t.addEventListener('click', () => {
                 const src = t.getAttribute('data-src');
-                if (src && mainImg) mainImg.src = src;
+                if (src && mainImg) {
+                    mainImg.src = src;
+                    // Update active state
+                    document.querySelectorAll('.gallery-thumbs .thumb').forEach(thumb => {
+                        thumb.classList.remove('active');
+                    });
+                    t.classList.add('active');
+                }
             });
         });
     }
