@@ -40,7 +40,59 @@ function loadFromLocalCache(key, maxAge = CACHE_TTL_MS) {
     }
 }
 
-// NOTE: cached banner removed per user request — cached rendering will be silent on first load.
+// Small helper to return an inline SVG for common facility keywords
+function getFacilityIcon(name) {
+    if (!name) return '';
+    const n = name.toLowerCase();
+    if (n.includes('parking')) return '<svg class="fac-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="20" height="16" rx="2" stroke="#374151" stroke-width="1.2" fill="#f3f4f6"/><text x="12" y="16" text-anchor="middle" font-size="12" fill="#111">P</text></svg>';
+    if (n.includes('pool')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M2 12c3 0 3-4 6-4s3 4 6 4 3-4 6-4v8H2v-4z" fill="#60a5fa"/></svg>';
+    if (n.includes('wifi') || n.includes('wi-fi')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M2 8c4-4 10-4 14 0" stroke="#111" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M5 11c2.5-2.5 6.5-2.5 9 0" stroke="#111" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="12" cy="17" r="1.5" fill="#111"/></svg>';
+    if (n.includes('restaurant') || n.includes('food')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 3v8a2 2 0 0 0 4 0V3" stroke="#111" stroke-width="1.2" fill="none"/><path d="M5 21v-4a2 2 0 0 1 2-2h1v6" stroke="#111" stroke-width="1.2" fill="none"/><path d="M16 21v-8" stroke="#111" stroke-width="1.2"/></svg>';
+    if (n.includes('fitness') || n.includes('gym')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="10" width="18" height="4" rx="1" fill="#e879f9"/></svg>';
+    if (n.includes('spa') || n.includes('sauna')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 19c0-4 4-6 6-6s6 2 6 6" stroke="#111" stroke-width="1.2" fill="none"/></svg>';
+    if (n.includes('bed') || n.includes('rooms') || n.includes('bedroom')) return '<svg class="fac-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="8" width="18" height="8" rx="1" stroke="#111" stroke-width="1.2" fill="#fff"/><path d="M3 14h18" stroke="#111" stroke-width="1.2"/></svg>';
+    // fallback small dot icon
+    return '<svg class="fac-svg" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg"><circle cx="4" cy="4" r="3" fill="#94a3b8"/></svg>';
+}
+
+// Try to extract photo URLs from the detailed hotel payload (several possible shapes)
+function extractPhotosFromDetails(data) {
+    if (!data) return [];
+    const urls = [];
+
+    // Top-level photos array (objects or strings)
+    if (Array.isArray(data.photos) && data.photos.length > 0) {
+        data.photos.forEach(p => {
+            if (!p) return;
+            if (typeof p === 'string') urls.push(p);
+            else urls.push(p.url_max750 || p.url_original || p.url_max300 || p.url_max1280 || p.url_max1280);
+        });
+    }
+
+    // rawData.photoUrls (string array)
+    if (data.rawData && Array.isArray(data.rawData.photoUrls)) {
+        data.rawData.photoUrls.forEach(u => { if (u) urls.push(u); });
+    }
+
+    // Rooms may contain photos under each room key
+    if (data.rooms && typeof data.rooms === 'object') {
+        Object.values(data.rooms).forEach(room => {
+            if (room && Array.isArray(room.photos)) {
+                room.photos.forEach(p => {
+                    if (!p) return;
+                    if (typeof p === 'string') urls.push(p);
+                    else urls.push(p.url_max750 || p.url_original || p.url_max300 || p.url_max1280);
+                });
+            }
+        });
+    }
+
+    // Deduplicate while preserving order
+    const seen = new Set();
+    const out = [];
+    urls.forEach(u => { if (u && !seen.has(u)) { seen.add(u); out.push(u); } });
+    return out;
+}
 
 // Run search automatically when the page is loaded (render cached data first if present)
 window.onload = () => {
@@ -80,10 +132,24 @@ window.onload = () => {
 
 // --- Helper function to fetch and cache hotel photos ---
 async function getHotelPhotos(hotelId) {
+    // Try in-memory cache first
     if (window.hotelPhotosCache && window.hotelPhotosCache[hotelId]) {
         return window.hotelPhotosCache[hotelId];
     }
-    const url = `https://booking-com15.p.rapidapi.com/api/v1/hotels/getHotelPhotos?hotel_id=${hotelId}`;
+    // Try persistent cache (so we don't exhaust photo API requests)
+    try {
+        const cached = loadFromLocalCache(CACHE_KEYS.hotelPrefix + 'photos_' + hotelId);
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+            // seed in-memory cache and return
+            if (!window.hotelPhotosCache) window.hotelPhotosCache = {};
+            window.hotelPhotosCache[hotelId] = cached;
+            return cached;
+        }
+    } catch (e) {
+        console.warn('Error reading cached hotel photos', e);
+    }
+
+    const url = `https://${API_HOST}/api/v1/hotels/getHotelPhotos?hotel_id=${hotelId}`;
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -94,8 +160,13 @@ async function getHotelPhotos(hotelId) {
         });
         const result = await response.json();
         const photos = result.data && Array.isArray(result.data) ? result.data : [];
-        window.hotelPhotosCache[hotelId] = photos;
-        return photos;
+        // extract usable urls (normalize)
+        const normalized = photos.map(p => p.url_max750 || p.url_original || p.url_max300 || p.url_max1280 || p.url_original).filter(Boolean);
+        // store as array of strings in both caches
+        if (!window.hotelPhotosCache) window.hotelPhotosCache = {};
+        window.hotelPhotosCache[hotelId] = normalized;
+        try { saveToLocalCache(CACHE_KEYS.hotelPrefix + 'photos_' + hotelId, normalized); } catch (e) { /* ignore */ }
+        return normalized;
     } catch (error) {
         console.error('Error fetching hotel photos:', error);
         return [];
@@ -117,13 +188,23 @@ async function renderHotelModal(data, hotelId) {
     modalName.innerText = data.hotel_name || 'Hotel Details';
     document.getElementById('modal-booking-link').href = data.url || '#';
 
-    // Fetch photos (from details or API)
+    // Fetch photos (from details or API). Support multiple sources and shapes.
     let photos = [];
-    if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
-        photos = data.photos.map(p => p.url_max750 || p.url_original || p.url_max300).filter(Boolean);
+    // First try to extract from the details payload (rooms, rawData, top-level)
+    const extracted = extractPhotosFromDetails(data);
+    if (extracted && extracted.length > 0) {
+        photos = extracted;
+        // persist photos for future offline use
+        try { saveToLocalCache(CACHE_KEYS.hotelPrefix + 'photos_' + hotelId, photos); } catch (e) { /* ignore */ }
     } else {
-        photos = await getHotelPhotos(hotelId);
-        photos = photos.map(p => p.url_max750 || p.url_original || p.url_max300).filter(Boolean);
+        // Fall back to the photo endpoint / persistent photo cache
+        const fetched = await getHotelPhotos(hotelId);
+        if (Array.isArray(fetched) && fetched.length > 0) {
+            // fetched is already normalized to strings by getHotelPhotos
+            photos = fetched;
+        } else {
+            photos = [];
+        }
     }
 
     // Address/location
@@ -138,15 +219,25 @@ async function renderHotelModal(data, hotelId) {
     } else if (data.property_highlight_strip) {
         facilities = data.property_highlight_strip.map(f => f.name);
     }
-    const facilitiesList = facilities.map(f => `<li>${f}</li>`).join('');
+    const facilitiesList = facilities.map(f => `<li class="facility-item"><span class="fac-icon">${getFacilityIcon(f)}</span><span class="fac-text">${f}</span></li>`).join('');
 
-    // Description (fallback to highlights/facilities)
-    let descriptionText = 'No description available.';
-    if (data.hotel_text && data.hotel_text.description) {
-        descriptionText = data.hotel_text.description;
-    } else if (facilities.length > 0) {
-        descriptionText = 'Facilities: ' + facilities.join(', ');
+    // Description (include hotel_text if present; fall back to first room description; always include facilities summary)
+    let descriptionText = '';
+    if (data.hotel_text && (data.hotel_text.description || data.hotel_text.short_description)) {
+        descriptionText = data.hotel_text.description || data.hotel_text.short_description || '';
     }
+    // fallback: try first room description
+    if (!descriptionText && data.rooms && typeof data.rooms === 'object') {
+        const firstRoom = Object.values(data.rooms)[0];
+        if (firstRoom && (firstRoom.description || firstRoom.rooms_description || firstRoom.short_description)) {
+            descriptionText = firstRoom.description || firstRoom.rooms_description || firstRoom.short_description || '';
+        }
+    }
+    // Ensure facilities appear inside the description if not already present
+    const facSummary = facilities.length > 0 ? `Facilities: ${facilities.join(', ')}` : '';
+    if (!descriptionText && facSummary) descriptionText = facSummary;
+    else if (facSummary && !descriptionText.includes('Facilities:')) descriptionText = descriptionText + `<br/><strong>Key facilities:</strong> ${facilities.join(', ')}`;
+    if (!descriptionText) descriptionText = 'No description available.';
 
     // Price
     let price = 'Check Site';
@@ -158,19 +249,28 @@ async function renderHotelModal(data, hotelId) {
     const reviews = data.review_nr || 0;
     const reviewScore = data.breakfast_review_score ? data.breakfast_review_score.rating : '';
 
-    // Render HTML
-    let contentHTML = `
-        <div class="detail-section">
-            <div class="hotel-photo-gallery">
-                ${(photos.length > 0) ? photos.map(url => `<img src='${url}' class='hotel-modal-img' alt='Hotel photo'>`).join('') : '<div>No images available.</div>'}
-            </div>
-            <h3>${data.hotel_name || 'Hotel Details'}</h3>
-            <p><strong>Address:</strong> ${address}</p>
-            <p><strong>Location:</strong> ${lat && lng ? `Lat: ${lat}, Lng: ${lng}` : 'N/A'}</p>
-            <p><strong>Price:</strong> ${price}</p>
-            <p><strong>Total Reviews:</strong> ${reviews}</p>
-            <p><strong>Review Score:</strong> ${reviewScore}</p>
+    // Render a nicer modal layout: gallery (left) + info card (right)
+    const mainImage = photos.length > 0 ? photos[0] : null;
+
+    const galleryHTML = photos.length > 0 ? `
+        <div class="gallery">
+            <div class="gallery-main"><img id="modal-main-img" src="${mainImage}" alt="Main photo"></div>
+            <div class="gallery-thumbs">${photos.map((p, i) => `<div class="thumb" data-src="${p}"><img src="${p}" alt="thumb-${i}"></div>`).join('')}</div>
         </div>
+    ` : `<div class="gallery-empty">No images available.</div>`;
+
+    const infoHTML = `
+        <div class="info-card">
+            <h2 class="modal-title">${data.hotel_name || 'Hotel Details'}</h2>
+            <div class="info-row"><span class="icon">📍</span><div><strong>Address</strong><div class="muted">${address}</div></div></div>
+            <div class="info-row"><span class="icon">📌</span><div><strong>Location</strong><div class="muted">${lat && lng ? `Lat: ${lat}, Lng: ${lng}` : 'N/A'}</div></div></div>
+            <div class="info-row"><span class="icon">💲</span><div><strong>Price</strong><div class="muted">${price}</div></div></div>
+            <div class="info-row"><span class="icon">⭐</span><div><strong>Reviews</strong><div class="muted">${reviews} • Score: ${reviewScore}</div></div></div>
+            <!-- booking link lives outside modal body in index.html -->
+        </div>
+    `;
+
+    const descHTML = `
         <div class="detail-section">
             <h3>Hotel Description</h3>
             <p>${descriptionText}</p>
@@ -182,7 +282,19 @@ async function renderHotelModal(data, hotelId) {
             </ul>
         </div>
     `;
-    modalBody.innerHTML = contentHTML;
+
+    modalBody.innerHTML = `<div class="modal-grid">${galleryHTML}<div class="modal-info">${infoHTML}${descHTML}</div></div>`;
+
+    // Wire up thumbnail clicks to update main image
+    if (photos.length > 0) {
+        const mainImg = document.getElementById('modal-main-img');
+        document.querySelectorAll('.gallery-thumbs .thumb').forEach(t => {
+            t.addEventListener('click', () => {
+                const src = t.getAttribute('data-src');
+                if (src && mainImg) mainImg.src = src;
+            });
+        });
+    }
 }
 
 // --- UI HELPER FUNCTIONS ---
@@ -294,9 +406,21 @@ async function initialSearch() {
     if (searchBtn) searchBtn.disabled = true;
 
     // Step A: Get Destination ID
-    // Removed UI-blocking cooldown that would have prevented retries after a 429.
+    // If we already have a valid `currentDestinationData` (for example it was
+    // loaded from the persisted last-search cache on startup), avoid overwriting
+    // it immediately — especially during the silent background refresh — because
+    // providers may return a transient 429 and we want to keep the cached value.
+    // Only call the destination API when we don't already have a matching entry.
+    const normalizedCity = cityInput.trim().toLowerCase();
+    const haveCachedDest = currentDestinationData && (
+        (currentDestinationData.city_name && currentDestinationData.city_name.toLowerCase() === normalizedCity) ||
+        (currentDestinationData.query && currentDestinationData.query.toLowerCase() === normalizedCity)
+    );
 
-    currentDestinationData = await getDestinationID(cityInput);
+    if (!haveCachedDest) {
+        // Removed UI-blocking cooldown that would have prevented retries after a 429.
+        currentDestinationData = await getDestinationID(cityInput);
+    }
 
     if (!currentDestinationData) {
         loading.classList.add('hidden');
