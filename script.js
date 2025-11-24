@@ -1,14 +1,10 @@
-// ============================================================================
 // GLOBAL STATE
-// ============================================================================
 let rawHotelData = [];
 let currentDestinationData = null;
 let hotelDetailsCache = {};
 let destCache = {};
 
-// ============================================================================
 // CACHE UTILITIES
-// ============================================================================
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
 const CACHE_KEYS = {
     lastSearch: 'sr_lastSearch',
@@ -41,9 +37,7 @@ function loadFromLocalCache(key, maxAge = CACHE_TTL_MS) {
     }
 }
 
-// ============================================================================
 // UI HELPER FUNCTIONS
-// ============================================================================
 function clearErrors() {
     document.querySelectorAll('.error-message').forEach(el => {
         el.classList.add('hidden');
@@ -84,9 +78,7 @@ function getFacilityIcon(name) {
     return '✓';
 }
 
-// ============================================================================
 // DATE UTILITIES
-// ============================================================================
 function toApiDate(dateStr) {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return null;
@@ -96,9 +88,7 @@ function toApiDate(dateStr) {
     return `${year}-${month}-${day}`;
 }
 
-// ============================================================================
 // API FUNCTIONS
-// ============================================================================
 
 // Get Destination ID
 async function getDestinationID(city) {
@@ -295,9 +285,7 @@ function extractPhotosFromDetails(data) {
     return out;
 }
 
-// ============================================================================
 // MAIN SEARCH FUNCTION
-// ============================================================================
 async function initialSearch() {
     const cityInput = document.getElementById('cityInput').value.trim();
     const checkin = document.getElementById('checkinDate').value;
@@ -377,9 +365,7 @@ async function initialSearch() {
     });
 }
 
-// ============================================================================
 // RENDER HOTELS
-// ============================================================================
 function reRenderHotels() {
     const container = document.getElementById('hotel-container');
     const sortOrder = document.getElementById('sortOrder').value;
@@ -449,9 +435,7 @@ function reRenderHotels() {
     });
 }
 
-// ============================================================================
 // HOTEL DETAILS MODAL
-// ============================================================================
 async function viewHotelDetails(hotelId, hotelName) {
     const modal = document.getElementById('hotel-details-modal');
     const modalName = document.getElementById('modal-hotel-name');
@@ -664,9 +648,7 @@ async function renderHotelModal(data, hotelId) {
     }
 }
 
-// ============================================================================
 // PAGE INITIALIZATION
-// ============================================================================
 window.onload = () => {
     // Set default values
     const defaultCity = "Rwanda";
