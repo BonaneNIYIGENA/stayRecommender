@@ -1,16 +1,26 @@
+// CONFIGURATION
+const API_CONFIG = {
+    host: API_HOST,
+    key: API_KEY
+};
+
+const CACHE_CONFIG = {
+    TTL_MS: 1000 * 60 * 60, // 1 hour
+    KEYS: {
+        lastSearch: 'sr_lastSearch',
+        hotelPrefix: 'sr_hotel_',
+        photosPrefix: 'sr_hotel_photos_'
+    }
+};
+
 // GLOBAL STATE
 let rawHotelData = [];
 let currentDestinationData = null;
 let hotelDetailsCache = {};
 let destCache = {};
+let hotelPhotosCache = {};
 
 // CACHE UTILITIES
-const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-const CACHE_KEYS = {
-    lastSearch: 'sr_lastSearch',
-    hotelPrefix: 'sr_hotel_'
-};
-
 function saveToLocalCache(key, value) {
     try {
         const wrapped = { __cachedAt: Date.now(), value };
@@ -20,7 +30,7 @@ function saveToLocalCache(key, value) {
     }
 }
 
-function loadFromLocalCache(key, maxAge = CACHE_TTL_MS) {
+function loadFromLocalCache(key, maxAge = CACHE_CONFIG.TTL_MS) {
     try {
         const raw = localStorage.getItem(key);
         if (!raw) return null;
@@ -35,6 +45,19 @@ function loadFromLocalCache(key, maxAge = CACHE_TTL_MS) {
         console.warn('Could not read from local cache', e);
         return null;
     }
+}
+
+// API UTILITIES
+function getApiHeaders() {
+    return {
+        'X-RapidAPI-Key': API_CONFIG.key,
+        'X-RapidAPI-Host': API_CONFIG.host
+    };
+}
+
+function createApiUrl(endpoint, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return `https://${API_CONFIG.host}/api/v1/hotels/${endpoint}${queryString ? '?' + queryString : ''}`;
 }
 
 // UI HELPER FUNCTIONS
@@ -95,13 +118,10 @@ async function getDestinationID(city) {
     const key = city.trim().toLowerCase();
     if (destCache[key]) return destCache[key];
 
-    const url = `https://${API_HOST}/api/v1/hotels/searchDestination?query=${encodeURIComponent(city)}`;
+    const url = createApiUrl('searchDestination', { query: city });
     const options = {
         method: 'GET',
-        headers: {
-            'X-RapidAPI-Key': API_KEY,
-            'X-RapidAPI-Host': API_HOST
-        }
+        headers: getApiHeaders()
     };
 
     try {
@@ -127,15 +147,26 @@ async function getDestinationID(city) {
 
 // Search Hotels
 async function searchHotels(destId, searchType, checkin, checkout) {
-    const url = `https://${API_HOST}/api/v1/hotels/searchHotels?dest_id=${destId}&search_type=${searchType}&arrival_date=${checkin}&departure_date=${checkout}&adults=1&room_qty=1&page_number=1&units=metric&temperature_unit=c&languagecode=en-us&currency_code=USD`;
+    const params = {
+        dest_id: destId,
+        search_type: searchType,
+        arrival_date: checkin,
+        departure_date: checkout,
+        adults: 1,
+        room_qty: 1,
+        page_number: 1,
+        units: 'metric',
+        temperature_unit: 'c',
+        languagecode: 'en-us',
+        currency_code: 'USD'
+    };
+
+    const url = createApiUrl('searchHotels', params);
 
     try {
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'X-RapidAPI-Key': API_KEY,
-                'X-RapidAPI-Host': API_HOST
-            }
+            headers: getApiHeaders()
         });
 
         if (!response.ok) {
@@ -153,21 +184,29 @@ async function searchHotels(destId, searchType, checkin, checkout) {
 
 // Get Hotel Details
 async function fetchHotelDetails(hotelId, arrivalDate, departureDate) {
-    const url = `https://${API_HOST}/api/v1/hotels/getHotelDetails?hotel_id=${hotelId}&arrival_date=${arrivalDate}&departure_date=${departureDate}&adults=1&room_qty=1&units=metric&languagecode=en-us&currency_code=USD`;
+    const params = {
+        hotel_id: hotelId,
+        arrival_date: arrivalDate,
+        departure_date: departureDate,
+        adults: 1,
+        room_qty: 1,
+        units: 'metric',
+        languagecode: 'en-us',
+        currency_code: 'USD'
+    };
+
+    const url = createApiUrl('getHotelDetails', params);
 
     try {
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'X-RapidAPI-Key': API_KEY,
-                'X-RapidAPI-Host': API_HOST
-            }
+            headers: getApiHeaders()
         });
 
         if (!response.ok) {
             if (response.status === 429) {
                 console.warn('Hotel Details API rate limited (429)');
-                const cached = loadFromLocalCache(CACHE_KEYS.hotelPrefix + hotelId);
+                const cached = loadFromLocalCache(CACHE_CONFIG.KEYS.hotelPrefix + hotelId);
                 if (cached) return cached;
             }
             return null;
@@ -177,7 +216,7 @@ async function fetchHotelDetails(hotelId, arrivalDate, departureDate) {
         const payload = (result && result.data) ? result.data : result;
         
         if (payload) {
-            saveToLocalCache(CACHE_KEYS.hotelPrefix + hotelId, payload);
+            saveToLocalCache(CACHE_CONFIG.KEYS.hotelPrefix + hotelId, payload);
         }
         
         return payload;
@@ -189,30 +228,26 @@ async function fetchHotelDetails(hotelId, arrivalDate, departureDate) {
 
 // Get Hotel Photos
 async function getHotelPhotos(hotelId) {
-    if (window.hotelPhotosCache && window.hotelPhotosCache[hotelId]) {
-        return window.hotelPhotosCache[hotelId];
+    if (hotelPhotosCache[hotelId]) {
+        return hotelPhotosCache[hotelId];
     }
 
     try {
-        const cached = loadFromLocalCache(CACHE_KEYS.hotelPrefix + 'photos_' + hotelId);
+        const cached = loadFromLocalCache(CACHE_CONFIG.KEYS.photosPrefix + hotelId);
         if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (!window.hotelPhotosCache) window.hotelPhotosCache = {};
-            window.hotelPhotosCache[hotelId] = cached;
+            hotelPhotosCache[hotelId] = cached;
             return cached;
         }
     } catch (e) {
         console.warn('Error reading cached photos', e);
     }
 
-    const url = `https://${API_HOST}/api/v1/hotels/getHotelPhotos?hotel_id=${hotelId}`;
+    const url = createApiUrl('getHotelPhotos', { hotel_id: hotelId });
     
     try {
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                'X-RapidAPI-Key': API_KEY,
-                'X-RapidAPI-Host': API_HOST
-            }
+            headers: getApiHeaders()
         });
 
         if (!response.ok) return [];
@@ -223,9 +258,8 @@ async function getHotelPhotos(hotelId) {
             p.url_max750 || p.url_original || p.url_max300 || p.url_max1280
         ).filter(Boolean);
 
-        if (!window.hotelPhotosCache) window.hotelPhotosCache = {};
-        window.hotelPhotosCache[hotelId] = normalized;
-        saveToLocalCache(CACHE_KEYS.hotelPrefix + 'photos_' + hotelId, normalized);
+        hotelPhotosCache[hotelId] = normalized;
+        saveToLocalCache(CACHE_CONFIG.KEYS.photosPrefix + hotelId, normalized);
         
         return normalized;
     } catch (error) {
@@ -359,7 +393,7 @@ async function initialSearch() {
     reRenderHotels();
 
     // Cache the search
-    saveToLocalCache(CACHE_KEYS.lastSearch, { 
+    saveToLocalCache(CACHE_CONFIG.KEYS.lastSearch, { 
         rawHotelData, 
         currentDestinationData 
     });
@@ -425,7 +459,7 @@ function reRenderHotels() {
                 <div class="hotel-name">${name}</div>
                 <div>
                     <span class="rating-badge">Score: ${rating}</span>
-                    <span style="font-size:0.9rem; color:#666;">| ${'⭐'.repeat(stars) || 'Unrated'}</span>
+                    <span style="font-size:0.9rem; color:#666;">| ${'⭐'.repeat(stars)}</span>
                 </div>
                 <div class="price-tag">${priceDisplay}</div>
                 <button class="search-btn" style="margin-top:15px; font-size:14px; padding:8px 15px;" onclick="viewHotelDetails(${hotelId}, '${safeName}')">View Details</button>
@@ -465,7 +499,7 @@ async function viewHotelDetails(hotelId, hotelName) {
 
     // Try cache first
     try {
-        const cachedHotel = loadFromLocalCache(CACHE_KEYS.hotelPrefix + hotelId);
+        const cachedHotel = loadFromLocalCache(CACHE_CONFIG.KEYS.hotelPrefix + hotelId);
         if (cachedHotel) {
             renderHotelModal(cachedHotel, hotelId);
             // Refresh in background
@@ -664,7 +698,7 @@ window.onload = () => {
 
     // Try to load cached results
     try {
-        const cached = loadFromLocalCache(CACHE_KEYS.lastSearch);
+        const cached = loadFromLocalCache(CACHE_CONFIG.KEYS.lastSearch);
         const sessionShown = sessionStorage.getItem('sr_cache_shown');
         
         if (!sessionShown && cached?.rawHotelData && cached?.currentDestinationData) {
